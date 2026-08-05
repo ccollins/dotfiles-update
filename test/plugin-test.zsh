@@ -39,6 +39,20 @@ falsy "up to date -> not behind" "_df_behind '$work' origin main"
 git -C "$work" reset --hard -q HEAD~1     # local now one commit behind remote
 truthy "local behind remote -> behind" "_df_behind '$work' origin main"
 
-rm -rf "$ZSH_CACHE_DIR" "$r1" "$r2" "$work" "${rem:h}"
+print "== dotfiles dispatcher =="
+drem="$(mktemp -d)/d.git"; git init -q --bare -b main "$drem"
+dwork="$(mktemp -d)"; git -C "$dwork" init -q -b main
+git -C "$dwork" config user.email t@t; git -C "$dwork" config user.name t
+echo x > "$dwork/f"; git -C "$dwork" add -A; git -C "$dwork" commit -qm init
+git -C "$dwork" remote add origin "$drem"; git -C "$dwork" push -q -u origin main
+export DOTFILES="$dwork"; _df_self="$dwork"          # keep every axis offline + green
+dotfiles-apply-hook() { : }                          # make _df_can_apply true
+git -C "$dwork" rev-parse HEAD >! "$ZSH_CACHE_DIR/.dotfiles-installed"
+eq "help lists subcommands" "yes" "$([[ "$(dotfiles help 2>&1)" == *status* ]] && echo yes)"
+eq "status reports up to date" "yes" "$([[ "$(dotfiles status 2>&1)" == *'up to date'* ]] && echo yes)"
+truthy "doctor passes on a healthy setup" "dotfiles doctor >/dev/null 2>&1"
+falsy  "unknown subcommand errors" "dotfiles bogus >/dev/null 2>&1"
+
+rm -rf "$ZSH_CACHE_DIR" "$r1" "$r2" "$work" "${rem:h}" "$dwork" "${drem:h}"
 print ""
 if (( _fail )); then print "PLUGIN TESTS FAILED"; exit 1; else print "plugin tests passed"; fi

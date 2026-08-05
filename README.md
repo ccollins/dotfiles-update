@@ -125,6 +125,18 @@ git -C "$DOTFILES" rev-parse HEAD > "${ZSH_CACHE_DIR:-$HOME/.cache/dotfiles-upda
 
 ## Commands
 
+One entry point, **`dotfiles <subcommand>`**:
+
+- **`dotfiles status`** — on-demand state of every axis (dirty · unpushed · not-applied ·
+  behind · plugin), ignoring the startup throttle. "Where do I stand right now?"
+- **`dotfiles doctor`** — check the setup is healthy (git/jq/timeout present, repo on the
+  tracked branch, plugin is a git checkout, engine on PATH, cache writable). Great on a
+  fresh machine.
+- **`dotfiles update`** / **`apply`** / **`plugin-update`** — see below.
+- **`dotfiles help`**.
+
+The underlying commands (also callable directly):
+
 - **`dotfiles-update`** — fast-forward pull the tracked branch, then apply. Refuses to
   run unless the repo is on the tracked branch (won't merge into a feature branch).
 - **`dotfiles-apply`** — restow packages (or run your hook) and record the installed commit.
