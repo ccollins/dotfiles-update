@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# merge-managed-json — reconcile a config file that its OWNING APP rewrites.
+#
+# Some tools own and continuously rewrite their JSON config (e.g. an editor or CLI
+# that persists UI/model/account choices), so you can't just symlink a tracked copy
+# in with stow — the app's edits would fight git. Instead track a SHARED base
+# (<name>.base.json) and merge it into the live file here: base is authoritative for
+# shared keys, while a declared set of MACHINE-LOCAL keys is preserved from whatever
+# the app last wrote. Only TOP-LEVEL keys are handled. Idempotent; safe to re-run.
+#
+# Usage: merge-managed-json <base.json> <live.json> [local-key ...]
+#   base.json   tracked shared config (source of truth for shared keys)
+#   live.json   the file the app owns/rewrites (regenerated here)
+#   local-key   top-level keys to keep per-machine from the live file (repeatable)
+#
+# Because base is authoritative, live edits to SHARED keys (e.g. enabling a plugin
+# in-app) are reverted on the next run — this prints a loud warning naming them so
+# it's never silent. Promote them into the base first with `capture-managed-json`.
+#
+# Example — Claude Code, keeping the per-machine model out of git:
+#   merge-managed-json "$DOTFILES/claude/settings.base.json" \
+#                      "$HOME/.claude/settings.json" model
+set -euo pipefail
+
+BASE="${1:?usage: merge-managed-json <base.json> <live.json> [local-key ...]}"
+LIVE="${2:?usage: merge-managed-json <base.json> <live.json> [local-key ...]}"
+shift 2                     # remaining args = machine-local keys to preserve
+
+command -v jq >/dev/null || { echo "merge-managed-json: jq not found" >&2; exit 1; }
+[ -f "$BASE" ] || { echo "merge-managed-json: base not found: $BASE" >&2; exit 1; }
+
+mkdir -p "$(dirname "$LIVE")"
+trap 'rm -f "$LIVE.tmp"' EXIT   # never strand a temp file on a mid-run failure
+
+# Current live keys (follows a legacy stow symlink). Fall back to {} if the file is
+# missing, a dangling symlink, or not valid JSON.
+current='{}'
+if [ -e "$LIVE" ]; then
+  current="$(cat "$LIVE" 2>/dev/null || echo '{}')"
+  printf '%s' "$current" | jq empty >/dev/null 2>&1 || current='{}'
+fi
+
+# Warn (don't silently revert) when the live file has SHARED-key changes not in the
+# base — i.e. live-minus-local-keys differs from base.
+drift="$(jq -rn --slurpfile base "$BASE" --argjson cur "$current" '
+  ($ARGS.positional) as $local
+  | ($cur | with_entries(select(.key as $k | ($local | index($k)) | not))) as $shared
+  | $base[0] as $b
+  | [ ($shared | keys[]) | select($shared[.] != $b[.]) ] | .[]
+' --args "$@" 2>/dev/null || true)"
+if [ -n "$drift" ]; then
+  echo "merge-managed-json: WARNING — $LIVE has shared changes not in the base;" >&2
+  echo "  reverting to base for: $(echo "$drift" | paste -sd, -)" >&2
+  echo "  keep them with: capture-managed-json \"$BASE\" \"$LIVE\" ${*:-}" >&2
+fi
+
+# Replace a legacy stow symlink with a real file we own (writing through it would
+# corrupt the tracked source).
+[ -L "$LIVE" ] && rm -f "$LIVE"
+
+# base wins for shared keys; graft each requested machine-local key from the live
+# file when it's present (non-null).
+jq -n --slurpfile base "$BASE" --argjson cur "$current" '
+  $base[0]
+  + ( reduce $ARGS.positional[] as $k ({};
+        if ($cur[$k] != null) then . + {($k): $cur[$k]} else . end) )
+' --args "$@" > "$LIVE.tmp"
+mv -f "$LIVE.tmp" "$LIVE"
+
+echo "merge-managed-json: wrote $LIVE (preserved local: ${*:-none})"

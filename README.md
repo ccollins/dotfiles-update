@@ -130,6 +130,44 @@ git -C "$DOTFILES" rev-parse HEAD > "${ZSH_CACHE_DIR:-$HOME/.cache/dotfiles-upda
   afterwards to load the new version. Requires the plugin to be a git clone (the default
   install); a vendored copy disables signal 4.
 
+## Bundled tools: reconciling app-managed configs
+
+Some tools **own and rewrite their own JSON config** (an editor/CLI that persists your
+model/account/UI choices), so you can't stow a tracked copy in and machine-specific
+choices shouldn't propagate. The plugin ships two small, **tool-agnostic** helpers for
+this (added to `PATH` when the plugin loads):
+
+- **`merge-managed-json <base> <live> [local-key…]`** — regenerate the app-owned `live`
+  file from a tracked `base`: base wins for shared keys, while the listed **machine-local
+  keys** are preserved from whatever the app last wrote. Only **top-level** keys are
+  handled. If `live` has shared changes not in `base`, it prints a loud warning (never a
+  silent revert) telling you to `capture` them.
+- **`capture-managed-json <base> <live> [local-key…]`** — the inverse: promote `live`'s
+  shared keys back into the tracked `base` (excluding the machine-local keys). Run it
+  after you change shared settings in-app, then commit the base.
+
+Wire them into your dotfiles repo by calling `merge-managed-json` from your install/apply
+step, once per managed file.
+
+### Example — Claude Code's `~/.claude/settings.json`
+
+Claude Code rewrites that file via `/model` and `/config`. Share plugins/theme but keep
+the per-machine `model` out of git:
+
+```sh
+# track the shared half once:
+jq 'del(.model)' ~/.claude/settings.json > claude/settings.base.json
+
+# reconcile on install/apply (keeps model per-machine):
+merge-managed-json "$DOTFILES/claude/settings.base.json" "$HOME/.claude/settings.json" model
+
+# later, after enabling a plugin in-app, promote it back to the base:
+capture-managed-json "$DOTFILES/claude/settings.base.json" "$HOME/.claude/settings.json" model
+```
+
+The companion [`dotfiles-template`](https://github.com/ccollins/dotfiles-template) wires
+this up for you with a `reconcile-managed` list.
+
 ## Notes & FAQ
 
 - **State files** live in `${ZSH_CACHE_DIR:-$HOME/.cache/dotfiles-update}`:
