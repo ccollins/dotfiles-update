@@ -14,19 +14,30 @@ brew install asciinema agg   # agg converts the .cast recording to a .gif
 
 ## Record
 
+### Recommended — auto mode (deterministic, tight framing)
+
 ```sh
 # from the repo root
-asciinema rec demo.cast -c "bash demo/record-demo.sh"
+asciinema rec demo.cast --overwrite --window-size 92x16 -c "bash demo/record-demo.sh --auto"
 ```
 
-This starts recording, runs the demo, and drops you into the sandbox shell — the four
-signals print as it launches. To show the tool doing something, type a few commands, then
-`exit` (which stops the recording and cleans up the sandbox):
+Plays a fixed sequence — the four startup signals, then `dotfiles status` — and exits on
+its own (stopping the recording and cleaning up the sandbox). No typing, and the fixed
+`--window-size` avoids the empty rows a taller terminal would leave. Bump the rows a touch
+if anything clips.
+
+### Interactive (explore / custom takes)
+
+```sh
+asciinema rec demo.cast --overwrite --window-size 92x18 -c "bash demo/record-demo.sh"
+```
+
+Drops you into the sandbox shell showing the four signals; try a few commands, then `exit`:
 
 ```
+dotfiles status          # on-demand state of every axis
+dotfiles doctor          # health check
 dotfiles-update          # pulls origin/main, then applies
-dotfiles-apply           # restow + record installed commit
-dotfiles-plugin-update   # fast-forward the plugin
 exit
 ```
 
