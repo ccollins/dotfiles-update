@@ -24,6 +24,8 @@
 
 : ${DOTFILES:=$HOME/dotfiles}
 _df_self="${0:A:h}"                                   # this plugin's own install dir
+# expose the bundled tools (merge-managed-json, capture-managed-json) on PATH
+[[ -d "$_df_self/bin" ]] && path=("$_df_self/bin" $path)
 _df_cache="${ZSH_CACHE_DIR:-$HOME/.cache/dotfiles-update}"
 [[ -d "$_df_cache" ]] || mkdir -p "$_df_cache"
 _df_update_file="$_df_cache/.dotfiles-update"
@@ -31,7 +33,7 @@ _df_plugin_file="$_df_cache/.dotfiles-plugin-update"
 _df_installed_file="$_df_cache/.dotfiles-installed"
 zstyle -s ':dotfiles:update' remote _df_remote || _df_remote=origin
 zstyle -s ':dotfiles:update' branch _df_branch || _df_branch=main
-_df_packages=(${DOTFILES_PACKAGES[@]})
+_df_packages=( ${DOTFILES_PACKAGES:+"${DOTFILES_PACKAGES[@]}"} )   # nounset-safe when unset
 
 _df_epoch() { zmodload zsh/datetime; echo $(( EPOCHSECONDS / 86400 )); }
 _df_stamp() { echo "LAST_EPOCH=$(_df_epoch)" >! "$1"; }

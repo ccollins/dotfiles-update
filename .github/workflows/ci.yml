@@ -1,0 +1,22 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y zsh jq shellcheck
+      - name: shellcheck (bundled bash tools)
+        run: shellcheck --severity=warning bin/merge-managed-json bin/capture-managed-json
+      - name: syntax
+        run: |
+          bash -n bin/merge-managed-json bin/capture-managed-json test/run.sh
+          zsh -n dotfiles-update.plugin.zsh test/plugin-test.zsh
+      - name: tests
+        run: bash test/run.sh

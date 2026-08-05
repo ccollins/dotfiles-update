@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# capture-managed-json — promote a live app-managed config's SHARED keys into its
+# tracked base. The inverse of merge-managed-json: base' = live MINUS the declared
+# machine-local keys.
+#
+# Run this after you change SHARED settings live (e.g. enable a plugin in-app) so
+# the change is tracked and reaches your other machines. Without it, base stays the
+# source of truth and merge-managed-json reverts the live change on the next run.
+# Review `git diff` on the base before committing.
+#
+# Usage: capture-managed-json <base.json> <live.json> [local-key ...]
+#   base.json   tracked shared config to update (written)
+#   live.json   the live file to capture shared keys from (read)
+#   local-key   top-level machine-local keys to EXCLUDE from the base (repeatable)
+#
+# Example — refresh the Claude base from the live file, keeping model out:
+#   capture-managed-json "$DOTFILES/claude/settings.base.json" \
+#                        "$HOME/.claude/settings.json" model
+set -euo pipefail
+
+BASE="${1:?usage: capture-managed-json <base.json> <live.json> [local-key ...]}"
+LIVE="${2:?usage: capture-managed-json <base.json> <live.json> [local-key ...]}"
+shift 2                     # remaining args = machine-local keys to exclude
+
+command -v jq >/dev/null || { echo "capture-managed-json: jq not found" >&2; exit 1; }
+[ -f "$LIVE" ] || { echo "capture-managed-json: live file not found: $LIVE" >&2; exit 1; }
+jq empty "$LIVE" >/dev/null 2>&1 || { echo "capture-managed-json: $LIVE is not valid JSON" >&2; exit 1; }
+
+mkdir -p "$(dirname "$BASE")"
+trap 'rm -f "$BASE.tmp"' EXIT
+
+# base = live with the machine-local keys removed (read live from stdin so the file
+# arg can't be mistaken for a --args positional)
+jq 'delpaths([ $ARGS.positional[] | [.] ])' --args "$@" < "$LIVE" > "$BASE.tmp"
+mv -f "$BASE.tmp" "$BASE"
+
+echo "capture-managed-json: wrote $BASE from $LIVE (excluded local: ${*:-none})"
