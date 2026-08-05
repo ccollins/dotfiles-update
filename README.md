@@ -8,6 +8,8 @@ to fix it.
 It's the reusable core extracted from a personal [GNU stow](https://www.gnu.org/software/stow/)
 dotfiles setup. Works with or without stow.
 
+![dotfiles-update in action](demo/demo.gif)
+
 ## What it does
 
 On each interactive startup it checks three **independent** signals for your dotfiles
