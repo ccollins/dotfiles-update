@@ -139,6 +139,83 @@ dotfiles-plugin-update() {
   fi
 }
 
+# --- `dotfiles` command (on-demand dispatcher) -------------------------------
+
+_df_help() {
+  print -r -- 'dotfiles — manage your dotfiles repo
+  status         show current state (dirty · unpushed · not-applied · behind · plugin)
+  update         pull the tracked branch, then apply
+  apply          restow packages / run apply hook, record installed commit
+  plugin-update  update the dotfiles-update plugin itself
+  doctor         check the setup is healthy
+  help           this message'
+}
+
+# on-demand status of every axis (ignores the startup throttle)
+_df_status() {
+  emulate -L zsh
+  local ok="%F{green}✓%f" warn="%F{yellow}⚠%f"
+  print -P "%Bdotfiles%b  $DOTFILES"
+  [[ -d "$DOTFILES/.git" ]] || { print -P "  $warn not a git repo"; return 1 }
+  [[ -n "$(git -C "$DOTFILES" status --porcelain 2>/dev/null)" ]] \
+    && print -P "  $warn uncommitted changes" || print -P "  $ok working tree clean"
+  [[ -n "$(git -C "$DOTFILES" log --oneline @{u}..HEAD 2>/dev/null)" ]] \
+    && print -P "  $warn unpushed commits" || print -P "  $ok nothing unpushed"
+  if _df_can_apply; then
+    local head installed
+    head=$(git -C "$DOTFILES" rev-parse --short HEAD 2>/dev/null)
+    [[ -f "$_df_installed_file" ]] && installed=$(<"$_df_installed_file")
+    if [[ "$(git -C "$DOTFILES" rev-parse HEAD 2>/dev/null)" == "$installed" ]]; then
+      print -P "  $ok applied ($head)"
+    else
+      print -P "  $warn not applied (repo $head ≠ installed ${installed[1,7]:-none}) — dotfiles-apply"
+    fi
+  fi
+  if _df_behind "$DOTFILES" "$_df_remote" "$_df_branch"; then
+    print -P "  $warn update available on $_df_remote/$_df_branch — dotfiles-update"
+  else
+    print -P "  $ok up to date with $_df_remote/$_df_branch"
+  fi
+  if [[ -d "$_df_self/.git" ]]; then
+    _df_behind "$_df_self" origin main \
+      && print -P "  $warn plugin update available — dotfiles-plugin-update" \
+      || print -P "  $ok plugin up to date"
+  fi
+}
+
+# check the setup is healthy (generic plumbing; app-specific configs are yours)
+_df_doctor() {
+  emulate -L zsh
+  local ok="%F{green}✓%f" bad="%F{red}✗%f" n=0
+  print -P "%Bdotfiles doctor%b"
+  _df_chk() { if eval "$2"; then print -P "  $ok $1"; else print -P "  $bad $1"; (( n++ )); fi }
+  _df_chk "git available"                          '(( $+commands[git] ))'
+  _df_chk "jq available"                           '(( $+commands[jq] ))'
+  _df_chk "timeout available (bounds the net check)" '(( $+commands[timeout] || $+commands[gtimeout] ))'
+  _df_chk "DOTFILES is a git repo ($DOTFILES)"     '[[ -d "$DOTFILES/.git" ]]'
+  _df_chk "on tracked branch ($_df_branch)"        '[[ "$(git -C "$DOTFILES" symbolic-ref --short -q HEAD)" == "$_df_branch" ]]'
+  _df_chk "plugin is a git checkout (self-update)" '[[ -d "$_df_self/.git" ]]'
+  _df_chk "engine on PATH (merge-managed-json)"    '(( $+commands[merge-managed-json] ))'
+  _df_chk "cache dir writable ($_df_cache)"        '[[ -w "$_df_cache" ]]'
+  unfunction _df_chk
+  (( n == 0 )) && print -P "  %F{green}all good%f" || print -P "  %F{yellow}$n issue(s) above%f"
+  return $(( n > 0 ))
+}
+
+dotfiles() {
+  emulate -L zsh
+  local cmd="${1:-help}"; (( $# )) && shift
+  case "$cmd" in
+    status)        _df_status ;;
+    doctor)        _df_doctor ;;
+    update)        dotfiles-update "$@" ;;
+    apply)         dotfiles-apply "$@" ;;
+    plugin-update) dotfiles-plugin-update "$@" ;;
+    help|-h|--help) _df_help ;;
+    *) print -P "%F{red}dotfiles: unknown command '$cmd'%f"; _df_help; return 1 ;;
+  esac
+}
+
 # --- mode-driven checks (run at startup) --------------------------------------
 
 # local HEAD moved past what's installed -> offer to restow

@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`dotfiles` command** — a single dispatcher with `status` (on-demand state of every
+  axis, ignoring the throttle), `doctor` (health check for a fresh machine), and
+  `update` / `apply` / `plugin-update` / `help` subcommands.
 - Bundled, tool-agnostic helpers **`merge-managed-json`** and **`capture-managed-json`**
   (in `bin/`, added to `PATH` when the plugin loads) for reconciling app-managed JSON
   config files from a tracked base while preserving machine-local keys. `merge` warns
