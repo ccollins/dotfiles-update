@@ -47,6 +47,9 @@ _df_run() {
 }
 
 # owner/repo slug from a repo's remote URL — $1=repo dir, $2=remote name
+# human-readable version of the installed plugin (tag if any, else short sha)
+_df_version() { git -C "$_df_self" describe --tags --always 2>/dev/null; }
+
 _df_slug() {
   local url; url=$(git -C "$1" config "remote.$2.url" 2>/dev/null) || return 1
   case "$url" in
@@ -132,7 +135,7 @@ dotfiles-plugin-update() {
   [[ -d "$_df_self/.git" ]] || { print -P "%F{yellow}⚠ plugin dir $_df_self is not a git checkout — reinstall to enable self-update%f"; return 1; }
   if git -C "$_df_self" pull --ff-only --quiet; then
     _df_stamp "$_df_plugin_file"
-    print -P "%F{green}✓ dotfiles-update plugin updated to $(git -C "$_df_self" rev-parse --short HEAD) — run 'exec zsh' to load it%f"
+    print -P "%F{green}✓ dotfiles-update plugin updated to $(_df_version) — run 'exec zsh' to load it%f"
   else
     print -P "%F{red}✗ plugin update was not a fast-forward — check $_df_self%f"
     return 1
@@ -179,7 +182,7 @@ _df_status() {
   if [[ -d "$_df_self/.git" ]]; then
     _df_behind "$_df_self" origin main \
       && print -P "  $warn plugin update available — dotfiles-plugin-update" \
-      || print -P "  $ok plugin up to date"
+      || print -P "  $ok plugin up to date ($(_df_version))"
   fi
 }
 

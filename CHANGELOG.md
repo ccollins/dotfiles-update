@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Version display: `dotfiles status` and `dotfiles-plugin-update` show the installed
+  version (`git describe --tags`, so tagged releases read as `v1.0.0`).
 - **`dotfiles` command** — a single dispatcher with `status` (on-demand state of every
   axis, ignoring the throttle), `doctor` (health check for a fresh machine), and
   `update` / `apply` / `plugin-update` / `help` subcommands.
