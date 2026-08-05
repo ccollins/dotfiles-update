@@ -84,15 +84,23 @@ _df_can_apply() { (( $+functions[dotfiles-apply-hook] )) || (( ${#_df_packages} 
 # the applied commit as "installed"
 dotfiles-apply() {
   emulate -L zsh
-  if (( $+functions[dotfiles-apply-hook] )); then
-    dotfiles-apply-hook || return
-  elif (( ${#_df_packages} )); then
+  local did=0
+  # 1. restow packages (if configured)
+  if (( ${#_df_packages} )); then
     (( ${+commands[stow]} )) || { print -P "%F{red}✗ stow not installed%f"; return 1; }
     local pkg
     for pkg in $_df_packages; do
       [[ -d "$DOTFILES/$pkg" ]] && stow -d "$DOTFILES" -t "$HOME" --restow "$pkg"
     done
-  else
+    did=1
+  fi
+  # 2. post-apply hook — runs AFTER stow (or standalone if no packages). Use it for
+  #    apply steps stow can't express (e.g. generating a config file from a template).
+  if (( $+functions[dotfiles-apply-hook] )); then
+    dotfiles-apply-hook || return
+    did=1
+  fi
+  if (( ! did )); then
     print -P "%F{yellow}⚠ nothing to apply: set DOTFILES_PACKAGES or define dotfiles-apply-hook%f"
     return 1
   fi

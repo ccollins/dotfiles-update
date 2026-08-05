@@ -101,15 +101,19 @@ The **apply** step is how the repo becomes live on the machine.
 
 - **Stow users:** set `DOTFILES_PACKAGES` to your stow package directories.
   `dotfiles-apply` runs `stow --restow` for each.
-- **Non-stow users:** define a `dotfiles-apply-hook` function and it's called instead
-  (return non-zero to abort):
+- **Post-apply hook:** define a `dotfiles-apply-hook` function for apply steps stow can't
+  express (e.g. generating a config file from a tracked template). It runs **after** the
+  restow when `DOTFILES_PACKAGES` is set, or **instead** of stow when it isn't. Return
+  non-zero to abort:
 
   ```zsh
-  dotfiles-apply-hook() { "$DOTFILES/install.sh"; }
+  dotfiles-apply-hook() { "$DOTFILES/install.sh"; }   # non-stow: this IS the apply
+  # or, alongside stow packages, a post-step:
+  dotfiles-apply-hook() { my-settings-sync; }         # runs after `stow --restow`
   ```
 
-- If neither is set, the **not-applied** signal is disabled (nothing to restow), but the
-  uncommitted/unpushed and update-available signals still work.
+- If neither `DOTFILES_PACKAGES` nor a hook is set, the **not-applied** signal is disabled
+  (nothing to restow), but the uncommitted/unpushed and update-available signals still work.
 
 Record the applied commit from your bootstrap/install script so the marker starts correct:
 
