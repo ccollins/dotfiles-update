@@ -1,5 +1,7 @@
 # dotfiles-update
 
+[![ci](https://github.com/ccollins/dotfiles-update/actions/workflows/ci.yml/badge.svg)](https://github.com/ccollins/dotfiles-update/actions/workflows/ci.yml)
+
 An [Oh My Zsh](https://ohmyz.sh)–style update check for a **Git-managed dotfiles repo**,
 modeled on OMZ's own `tools/check_for_upgrade.sh`. It keeps your dotfiles honest by
 surfacing, on each interactive shell startup, whether your repo has drifted — and offers
