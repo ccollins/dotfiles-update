@@ -18,6 +18,12 @@ repo (`$DOTFILES`, default `~/dotfiles`):
 | **Uncommitted / unpushed** | working tree & upstream | no | a warning |
 | **Not applied** | local `HEAD` vs the last *applied* commit | no | `dotfiles-apply` (restow) |
 | **Update available** | local vs the tracked remote branch | yes (throttled) | `dotfiles-update` (pull) + a changelog link |
+| **Plugin update** | this plugin's own checkout vs its remote | yes (throttled) | `dotfiles-plugin-update` + a changelog link |
+
+The **"plugin update"** signal is the plugin dogfooding itself: it checks whether the
+installed copy of *this plugin* is behind its own remote and tells you the same way it
+tells you about your dotfiles. That's how plugin updates reach you without re-running
+your whole bootstrap. Defaults to `reminder` mode (just tells you; doesn't act).
 
 The **"not applied"** signal is the interesting one: a marker file records the commit you
 last *applied* to the machine (restowed / bootstrapped). If you `git pull` or commit and
@@ -71,11 +77,12 @@ All optional; sensible defaults shown.
 export DOTFILES=$HOME/dotfiles              # path to your dotfiles repo
 DOTFILES_PACKAGES=(shell git ssh)           # stow packages to restow on "apply"
 
-zstyle ':dotfiles:update' mode      prompt  # prompt(default) | auto | reminder | disabled
-zstyle ':dotfiles:apply'  mode      prompt  # prompt(default) | auto | reminder | disabled
-zstyle ':dotfiles:update' frequency 1       # days between remote checks (throttle)
-zstyle ':dotfiles:update' remote    origin  # remote name
-zstyle ':dotfiles:update' branch    main    # tracked branch
+zstyle ':dotfiles:update' mode      prompt   # prompt(default) | auto | reminder | disabled
+zstyle ':dotfiles:apply'  mode      prompt   # prompt(default) | auto | reminder | disabled
+zstyle ':dotfiles:plugin' mode      reminder # self-update: prompt | auto | reminder(default) | disabled
+zstyle ':dotfiles:update' frequency 1        # days between remote checks (throttle)
+zstyle ':dotfiles:update' remote    origin   # remote name
+zstyle ':dotfiles:update' branch    main     # tracked branch
 ```
 
 Modes (borrowed verbatim from OMZ):
@@ -115,6 +122,9 @@ git -C "$DOTFILES" rev-parse HEAD > "${ZSH_CACHE_DIR:-$HOME/.cache/dotfiles-upda
 - **`dotfiles-update`** — fast-forward pull the tracked branch, then apply. Refuses to
   run unless the repo is on the tracked branch (won't merge into a feature branch).
 - **`dotfiles-apply`** — restow packages (or run your hook) and record the installed commit.
+- **`dotfiles-plugin-update`** — fast-forward the plugin's own checkout; run `exec zsh`
+  afterwards to load the new version. Requires the plugin to be a git clone (the default
+  install); a vendored copy disables signal 4.
 
 ## Notes & FAQ
 
