@@ -73,6 +73,22 @@ eq "capture keeps theme" "dark" "$(jq -r .theme "$d/cbase.json")"
 
 rm -rf "$d"
 
+echo "== vendored-check =="
+vd="$(mktemp -d)"
+rem="$vd/up.git"; git init -q --bare -b main "$rem"
+wk="$vd/wk"; git init -q -b main "$wk"
+git -C "$wk" config user.email t@t; git -C "$wk" config user.name t
+echo a > "$wk/a"; git -C "$wk" add -A; git -C "$wk" commit -qm one
+git -C "$wk" remote add origin "$rem"; git -C "$wk" push -q origin main
+S="$(git -C "$wk" rev-parse HEAD)"
+mkdir -p "$vd/root/foo"
+printf 'repo=%s\nref=%s\nbranch=main\n' "$rem" "$S" > "$vd/root/foo/.vendor"
+has "vendored up-to-date" "$(vendored-check "$vd/root")" "up to date"
+printf 'repo=%s\nref=%s\nbranch=main\n' "$rem" "0000000000000000000000000000000000000000" > "$vd/root/foo/.vendor"
+has "vendored behind" "$(vendored-check "$vd/root")" "update available"
+has "vendored empty dir" "$(vendored-check "$vd/empty" 2>/dev/null || true)" "no .vendor files"
+rm -rf "$vd"
+
 echo "== plugin helpers (zsh) =="
 zsh "$ROOT/test/plugin-test.zsh" || fail=1
 

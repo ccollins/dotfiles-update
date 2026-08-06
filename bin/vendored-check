@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# vendored-check — report whether any vendored (copied-in, pinned) dependency has
+# upstream updates. Read-only: it never changes anything.
+#
+# Scans <dir>/*/.vendor for each DIR given. A `.vendor` file records provenance
+# next to the vendored copy:
+#     repo=https://github.com/owner/name      # upstream (https or git@ GitHub)
+#     ref=<full pinned commit sha>            # what's currently vendored
+#     branch=main                             # upstream branch to compare (default main)
+#
+# Compares each pin against `git ls-remote <repo> <branch>` and prints up-to-date /
+# update-available (+ a GitHub compare URL). To update: re-vendor from upstream and
+# bump `ref` in the `.vendor` file.
+#
+# Usage: vendored-check <dir> [<dir> ...]
+set -euo pipefail
+
+[ "$#" -ge 1 ] || { echo "usage: vendored-check <dir> [<dir> ...]" >&2; exit 2; }
+
+_run() { if command -v timeout >/dev/null; then timeout 8 "$@"; elif command -v gtimeout >/dev/null; then gtimeout 8 "$@"; else "$@"; fi; }
+_slug() {
+  case "$1" in
+    https://github.com/*) printf '%s' "${1#https://github.com/}" | sed 's/\.git$//' ;;
+    git@github.com:*)     printf '%s' "${1#git@github.com:}"     | sed 's/\.git$//' ;;
+    *) return 1 ;;
+  esac
+}
+
+shopt -s nullglob
+files=()
+for d in "$@"; do files+=("$d"/*/.vendor); done
+if [ ${#files[@]} -eq 0 ]; then
+  echo "vendored-check: no .vendor files under: $*"
+  exit 0
+fi
+
+echo "vendored:"
+behind=0
+for vf in "${files[@]}"; do
+  name="$(basename "$(dirname "$vf")")"
+  repo=""; ref=""; branch="main"
+  # shellcheck disable=SC1090
+  source "$vf"
+  if [ -z "$repo" ] || [ -z "$ref" ]; then
+    printf '  \033[31m✗\033[0m %s — malformed .vendor (need repo= and ref=)\n' "$name"; continue
+  fi
+  up="$(_run git ls-remote "$repo" "$branch" 2>/dev/null | awk 'NR==1{print $1}')"
+  if [ -z "$up" ]; then
+    printf '  ? %s — could not reach %s\n' "$name" "$repo"
+  elif [ "$up" = "$ref" ]; then
+    printf '  \033[32m✓\033[0m %s — up to date (%s)\n' "$name" "${ref:0:7}"
+  else
+    behind=1
+    printf '  \033[33m⬆\033[0m %s — update available: pinned %s → upstream %s\n' "$name" "${ref:0:7}" "${up:0:7}"
+    if slug="$(_slug "$repo")"; then
+      printf '      https://github.com/%s/compare/%s...%s\n' "$slug" "${ref:0:7}" "${up:0:7}"
+    fi
+  fi
+done
+
+[ "$behind" -eq 0 ] && echo "all vendored copies up to date."
+exit 0

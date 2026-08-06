@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`vendored-check <dir>…`** + **`dotfiles vendored`** — check vendored (pinned,
+  copied-in) dependencies for upstream updates via a `.vendor` provenance file
+  (`repo`/`ref`/`branch`) next to each copy. `dotfiles vendored` reads dirs from
+  `DOTFILES_VENDORED_DIRS` or its args.
 - Version display: `dotfiles status` and `dotfiles-plugin-update` show the installed
   version (`git describe --tags`, so tagged releases read as `v1.0.0`).
 - **`dotfiles` command** — a single dispatcher with `status` (on-demand state of every

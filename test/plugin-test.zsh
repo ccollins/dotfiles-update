@@ -49,6 +49,8 @@ export DOTFILES="$dwork"; _df_self="$dwork"          # keep every axis offline +
 dotfiles-apply-hook() { : }                          # make _df_can_apply true
 git -C "$dwork" rev-parse HEAD >! "$ZSH_CACHE_DIR/.dotfiles-installed"
 eq "help lists subcommands" "yes" "$([[ "$(dotfiles help 2>&1)" == *status* ]] && echo yes)"
+eq "help lists vendored" "yes" "$([[ "$(dotfiles help 2>&1)" == *vendored* ]] && echo yes)"
+falsy "vendored with no dirs hints" "dotfiles vendored >/dev/null 2>&1"
 eq "status reports up to date" "yes" "$([[ "$(dotfiles status 2>&1)" == *'up to date'* ]] && echo yes)"
 truthy "doctor passes on a healthy setup" "dotfiles doctor >/dev/null 2>&1"
 falsy  "unknown subcommand errors" "dotfiles bogus >/dev/null 2>&1"

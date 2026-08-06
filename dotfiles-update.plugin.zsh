@@ -151,6 +151,7 @@ _df_help() {
   apply          restow packages / run apply hook, record installed commit
   plugin-update  update the dotfiles-update plugin itself
   doctor         check the setup is healthy
+  vendored       check vendored (pinned) dependencies for upstream updates
   help           this message'
 }
 
@@ -205,6 +206,21 @@ _df_doctor() {
   return $(( n > 0 ))
 }
 
+# check vendored (pinned) dependencies for upstream updates. Dirs come from the
+# args, else from the DOTFILES_VENDORED_DIRS array (each dir holds <name>/.vendor).
+_df_vendored() {
+  emulate -L zsh
+  local -a dirs
+  if (( $# )); then dirs=("$@")
+  else dirs=( ${DOTFILES_VENDORED_DIRS:+"${DOTFILES_VENDORED_DIRS[@]}"} ); fi
+  if (( ! ${#dirs} )); then
+    print -P "%F{yellow}dotfiles vendored: pass a dir, or set DOTFILES_VENDORED_DIRS (dirs holding <name>/.vendor)%f"
+    return 1
+  fi
+  (( ${+commands[vendored-check]} )) || { print -P "%F{red}vendored-check not found (is the plugin bin on PATH?)%f"; return 1 }
+  vendored-check "${dirs[@]}"
+}
+
 dotfiles() {
   emulate -L zsh
   local cmd="${1:-help}"; (( $# )) && shift
@@ -214,6 +230,7 @@ dotfiles() {
     update)        dotfiles-update "$@" ;;
     apply)         dotfiles-apply "$@" ;;
     plugin-update) dotfiles-plugin-update "$@" ;;
+    vendored)      _df_vendored "$@" ;;
     help|-h|--help) _df_help ;;
     *) print -P "%F{red}dotfiles: unknown command '$cmd'%f"; _df_help; return 1 ;;
   esac
