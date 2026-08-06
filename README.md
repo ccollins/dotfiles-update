@@ -134,6 +134,8 @@ One entry point, **`dotfiles <subcommand>`**:
 - **`dotfiles doctor`** — check the setup is healthy (git/jq/timeout present, repo on the
   tracked branch, plugin is a git checkout, engine on PATH, cache writable). Great on a
   fresh machine.
+- **`dotfiles vendored`** — check vendored (pinned) dependencies for upstream updates
+  (see "Checking vendored dependencies" below).
 - **`dotfiles update`** / **`apply`** / **`plugin-update`** — see below.
 - **`dotfiles help`**.
 
@@ -183,6 +185,40 @@ capture-managed-json "$DOTFILES/claude/settings.base.json" "$HOME/.claude/settin
 
 The companion [`dotfiles-template`](https://github.com/ccollins/dotfiles-template) wires
 this up for you with a `reconcile-managed` list.
+
+## Checking vendored dependencies
+
+When you copy an upstream thing into your dotfiles pinned to a commit (a skill, a
+config, a script that has no package/marketplace), it's a **frozen fork** — nothing
+tells you when upstream moves. `vendored-check` closes that.
+
+Drop a **`.vendor`** file next to each vendored copy:
+
+```sh
+# ~/dotfiles/claude/.claude/skills/interview-coach/.vendor
+repo=https://github.com/owner/name
+ref=<full pinned commit sha>
+branch=main
+```
+
+Then:
+
+```zsh
+vendored-check <dir> [<dir> ...]      # scans <dir>/*/.vendor, reports up-to-date / behind
+```
+
+Each behind entry prints a GitHub compare URL so you can eyeball the diff before
+re-vendoring (which is a deliberate manual step — re-copy, then bump `ref`). It's
+read-only and `git ls-remote`-based (no clone, timeout-guarded).
+
+Expose it through the dispatcher by pointing `DOTFILES_VENDORED_DIRS` at the dirs that
+hold your `.vendor` files (before the `oh-my-zsh.sh` source line):
+
+```zsh
+DOTFILES_VENDORED_DIRS=("$DOTFILES/claude/.claude/skills")
+```
+
+Now `dotfiles vendored` (no args) checks them all.
 
 ## Notes & FAQ
 
