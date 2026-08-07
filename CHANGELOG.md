@@ -5,6 +5,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-08-07
+
+### Fixed
+- `dotfiles status` and the startup reminders now suggest the dispatcher form
+  (`dotfiles update` / `apply` / `plugin-update`) instead of the hyphenated commands.
+
 ## [1.1.0] - 2026-08-07
 
 ### Added
