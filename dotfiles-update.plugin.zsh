@@ -172,17 +172,17 @@ _df_status() {
     if [[ "$(git -C "$DOTFILES" rev-parse HEAD 2>/dev/null)" == "$installed" ]]; then
       print -P "  $ok applied ($head)"
     else
-      print -P "  $warn not applied (repo $head ≠ installed ${installed[1,7]:-none}) — dotfiles-apply"
+      print -P "  $warn not applied (repo $head ≠ installed ${installed[1,7]:-none}) — dotfiles apply"
     fi
   fi
   if _df_behind "$DOTFILES" "$_df_remote" "$_df_branch"; then
-    print -P "  $warn update available on $_df_remote/$_df_branch — dotfiles-update"
+    print -P "  $warn update available on $_df_remote/$_df_branch — dotfiles update"
   else
     print -P "  $ok up to date with $_df_remote/$_df_branch"
   fi
   if [[ -d "$_df_self/.git" ]]; then
     _df_behind "$_df_self" origin main \
-      && print -P "  $warn plugin update available — dotfiles-plugin-update" \
+      && print -P "  $warn plugin update available — dotfiles plugin-update" \
       || print -P "  $ok plugin up to date ($(_df_version))"
   fi
 }
@@ -253,13 +253,13 @@ _df_handle_apply() {
   [[ "$head" != "$installed" ]] || return
   print -P "%F{yellow}⬇ dotfiles: repo (${head[1,7]}) is newer than installed (${installed[1,7]})%f"
   case "$mode" in
-    reminder) print -P "  run %F{green}dotfiles-apply%f to restow" ;;
+    reminder) print -P "  run %F{green}dotfiles apply%f to restow" ;;
     auto)     dotfiles-apply ;;
     *)        printf "  Apply (restow) now? [Y/n] "
               local ans; read -r -k 1 ans; [[ "$ans" == $'\n' ]] || echo
               case "$ans" in
                 [yY$'\n']) dotfiles-apply ;;
-                *) print -P "  run %F{green}dotfiles-apply%f later" ;;
+                *) print -P "  run %F{green}dotfiles apply%f later" ;;
               esac ;;
   esac
 }
@@ -281,13 +281,13 @@ _df_handle_update() {
     print -P "%F{cyan}⬆ dotfiles: updates available on $_df_remote/$_df_branch%f"
     [[ -n "$slug" ]] && print "  changelog: https://github.com/$slug/compare/${lh}...${_df_rsha[1,7]}"
     case "$mode" in
-      reminder) print -P "  run %F{green}dotfiles-update%f to pull" ;;
+      reminder) print -P "  run %F{green}dotfiles update%f to pull" ;;
       auto)     dotfiles-update ;;
       *)        printf "  Pull now? [Y/n] "
                 local ans; read -r -k 1 ans; [[ "$ans" == $'\n' ]] || echo
                 case "$ans" in
                   [yY$'\n']) dotfiles-update ;;
-                  *) print -P "  run %F{green}dotfiles-update%f later" ;;
+                  *) print -P "  run %F{green}dotfiles update%f later" ;;
                 esac ;;
     esac
     _df_stamp "$_df_update_file"
@@ -317,13 +317,13 @@ _df_handle_plugin() {
     print -P "%F{magenta}⬆ dotfiles-update plugin: a new version is available%f"
     [[ -n "$slug" ]] && print "  changelog: https://github.com/$slug/compare/${lh}...${_df_rsha[1,7]}"
     case "$mode" in
-      reminder) print -P "  run %F{green}dotfiles-plugin-update%f to update" ;;
+      reminder) print -P "  run %F{green}dotfiles plugin-update%f to update" ;;
       auto)     dotfiles-plugin-update ;;
       *)        printf "  Update the plugin now? [Y/n] "
                 local ans; read -r -k 1 ans; [[ "$ans" == $'\n' ]] || echo
                 case "$ans" in
                   [yY$'\n']) dotfiles-plugin-update ;;
-                  *) print -P "  run %F{green}dotfiles-plugin-update%f later" ;;
+                  *) print -P "  run %F{green}dotfiles plugin-update%f later" ;;
                 esac ;;
     esac
     _df_stamp "$_df_plugin_file"
