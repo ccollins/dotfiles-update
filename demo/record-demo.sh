@@ -64,7 +64,7 @@ zstyle ':dotfiles:apply'  mode reminder
 zstyle ':dotfiles:plugin' mode reminder
 plugins=(dotfiles-update)
 source "\$ZSH/oh-my-zsh.sh"
-[[ "\$DEMO_MODE" == interactive ]] && print -P "\n%F{244}demo sandbox — try: dotfiles status · dotfiles doctor · dotfiles-update · exit%f"
+[[ "\$DEMO_MODE" == interactive ]] && print -P "\n%F{244}demo sandbox — try: dotfiles status · dotfiles doctor · dotfiles update · exit%f"
 zshexit() { rm -rf "$SBX"; }
 EOF
 
