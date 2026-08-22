@@ -39,6 +39,24 @@ falsy "up to date -> not behind" "_df_behind '$work' origin main"
 git -C "$work" reset --hard -q HEAD~1     # local now one commit behind remote
 truthy "local behind remote -> behind" "_df_behind '$work' origin main"
 
+print "== dotfiles-banner =="
+typeset -a _art
+_art=( ${(f)"$(dotfiles-banner --no-tagline 'applied at abc1234')"} )
+_art=( ${(M)_art:#[█╚]*} )   # the art rows: every one starts with a block or a corner
+eq "banner has 6 art rows" "6" "${#_art}"
+typeset -A _w; for _r in $_art; do _w[${#_r}]=1; done
+eq "art rows share one width" "1" "${#_w}"          # a mis-edited glyph would ragged it
+eq "art is 61 columns wide" "61" "${(k)_w}"
+zstyle ':dotfiles:banner' mode plain
+eq "plain mode keeps the one-liner" "yes" \
+  "$([[ "$(_df_celebrate 'msg' '✓ plain line')" == *'plain line'* ]] && print yes)"
+eq "plain mode prints no art" "yes" \
+  "$([[ "$(_df_celebrate 'msg' '✓ plain line')" != *█* ]] && print yes)"
+eq "plain mode with no fallback is silent" "" "$(_df_celebrate 'msg' '')"
+zstyle -d ':dotfiles:banner' mode
+eq "fancy mode prints the art" "yes" \
+  "$([[ "$(_df_celebrate 'msg' '✓ plain line')" == *█* ]] && print yes)"
+
 print "== dotfiles dispatcher =="
 drem="$(mktemp -d)/d.git"; git init -q --bare -b main "$drem"
 dwork="$(mktemp -d)"; git -C "$dwork" init -q -b main
