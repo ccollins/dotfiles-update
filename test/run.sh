@@ -89,6 +89,15 @@ has "vendored behind" "$(vendored-check "$vd/root")" "update available"
 has "vendored empty dir" "$(vendored-check "$vd/empty" 2>/dev/null || true)" "no .vendor files"
 rm -rf "$vd"
 
+echo "== dotfiles-banner =="
+b="$(dotfiles-banner 'applied at abc1234 · 2 packages restowed')"
+has "banner prints the art" "$b" "██████╗"
+has "banner prints the message" "$b" "applied at abc1234"
+hasnt "no color when not a tty" "$b" "$(printf '\033')"
+has "custom tagline" "$(dotfiles-banner --tagline xyzzy 'm')" "xyzzy"
+eq "--no-tagline drops exactly one line" "1" \
+  "$(( $(dotfiles-banner 'm' | wc -l) - $(dotfiles-banner --no-tagline 'm' | wc -l) ))"
+
 echo "== plugin helpers (zsh) =="
 zsh "$ROOT/test/plugin-test.zsh" || fail=1
 

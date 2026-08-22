@@ -14,6 +14,7 @@
 #   zstyle ':dotfiles:update' mode prompt   # prompt(default)|auto|reminder|disabled
 #   zstyle ':dotfiles:apply'  mode prompt   # prompt(default)|auto|reminder|disabled
 #   zstyle ':dotfiles:plugin' mode reminder # self-update: prompt|auto|reminder(default)|disabled
+#   zstyle ':dotfiles:banner' mode fancy    # fancy(default)|plain — the ASCII banner
 #   zstyle ':dotfiles:update' frequency 1   # days between remote checks
 #   zstyle ':dotfiles:update' remote origin # remote name (default origin)
 #   zstyle ':dotfiles:update' branch main   # tracked branch (default main)
@@ -83,19 +84,38 @@ _df_due() {
 
 _df_can_apply() { (( $+functions[dotfiles-apply-hook] )) || (( ${#_df_packages} )); }
 
+# Mark a milestone (applied / updated / all green) with the big rainbow banner —
+# the art lives in bin/dotfiles-banner so a bootstrap script can print the same
+# thing. Falls back to a one-line message when the banner is off or unavailable.
+#   $1 = banner message  $2 = plain fallback (print -P; empty = print nothing)
+#   $3 = tagline override (default: a random one from the banner's own list)
+_df_celebrate() {
+  emulate -L zsh
+  local mode; zstyle -s ':dotfiles:banner' mode mode || mode=fancy
+  if [[ "$mode" == fancy ]] && (( ${+commands[dotfiles-banner]} )); then
+    local -a extra
+    [[ -n "${3-}" ]] && extra=(--tagline "$3")
+    dotfiles-banner "${extra[@]}" "$1"
+  elif [[ -n "${2-}" ]]; then
+    print -P "$2"
+  fi
+}
+
 # --- public helpers -----------------------------------------------------------
 
 # apply the repo to the machine (restow packages or run the hook), then record
 # the applied commit as "installed"
 dotfiles-apply() {
   emulate -L zsh
-  local did=0
+  local did=0 n=0
   # 1. restow packages (if configured)
   if (( ${#_df_packages} )); then
     (( ${+commands[stow]} )) || { print -P "%F{red}✗ stow not installed%f"; return 1; }
     local pkg
     for pkg in $_df_packages; do
-      [[ -d "$DOTFILES/$pkg" ]] && stow -d "$DOTFILES" -t "$HOME" --restow "$pkg"
+      [[ -d "$DOTFILES/$pkg" ]] || continue
+      stow -d "$DOTFILES" -t "$HOME" --restow "$pkg"
+      (( ++n ))
     done
     did=1
   fi
@@ -110,7 +130,10 @@ dotfiles-apply() {
     return 1
   fi
   git -C "$DOTFILES" rev-parse HEAD >! "$_df_installed_file"
-  print -P "%F{green}✓ dotfiles applied at $(git -C "$DOTFILES" rev-parse --short HEAD)%f"
+  local sha; sha=$(git -C "$DOTFILES" rev-parse --short HEAD)
+  local msg="applied at $sha"
+  (( n )) && msg+=" · $n package$( (( n == 1 )) || print -n s ) restowed"
+  _df_celebrate "$msg" "%F{green}✓ dotfiles applied at $sha%f"
 }
 
 # pull remote updates (fast-forward only), then apply per :dotfiles:apply mode
@@ -135,7 +158,9 @@ dotfiles-plugin-update() {
   [[ -d "$_df_self/.git" ]] || { print -P "%F{yellow}⚠ plugin dir $_df_self is not a git checkout — reinstall to enable self-update%f"; return 1; }
   if git -C "$_df_self" pull --ff-only --quiet; then
     _df_stamp "$_df_plugin_file"
-    print -P "%F{green}✓ dotfiles-update plugin updated to $(_df_version) — run 'exec zsh' to load it%f"
+    _df_celebrate "plugin updated to $(_df_version)" \
+      "%F{green}✓ dotfiles-update plugin updated to $(_df_version) — run 'exec zsh' to load it%f" \
+      "run 'exec zsh' to load it"
   else
     print -P "%F{red}✗ plugin update was not a fast-forward — check $_df_self%f"
     return 1
@@ -158,13 +183,19 @@ _df_help() {
 # on-demand status of every axis (ignores the startup throttle)
 _df_status() {
   emulate -L zsh
-  local ok="%F{green}✓%f" warn="%F{yellow}⚠%f"
+  local ok="%F{green}✓%f" warn="%F{yellow}⚠%f" warns=0
   print -P "%Bdotfiles%b  $DOTFILES"
   [[ -d "$DOTFILES/.git" ]] || { print -P "  $warn not a git repo"; return 1 }
-  [[ -n "$(git -C "$DOTFILES" status --porcelain 2>/dev/null)" ]] \
-    && print -P "  $warn uncommitted changes" || print -P "  $ok working tree clean"
-  [[ -n "$(git -C "$DOTFILES" log --oneline @{u}..HEAD 2>/dev/null)" ]] \
-    && print -P "  $warn unpushed commits" || print -P "  $ok nothing unpushed"
+  if [[ -n "$(git -C "$DOTFILES" status --porcelain 2>/dev/null)" ]]; then
+    print -P "  $warn uncommitted changes"; (( ++warns ))
+  else
+    print -P "  $ok working tree clean"
+  fi
+  if [[ -n "$(git -C "$DOTFILES" log --oneline @{u}..HEAD 2>/dev/null)" ]]; then
+    print -P "  $warn unpushed commits"; (( ++warns ))
+  else
+    print -P "  $ok nothing unpushed"
+  fi
   if _df_can_apply; then
     local head installed
     head=$(git -C "$DOTFILES" rev-parse --short HEAD 2>/dev/null)
@@ -173,18 +204,25 @@ _df_status() {
       print -P "  $ok applied ($head)"
     else
       print -P "  $warn not applied (repo $head ≠ installed ${installed[1,7]:-none}) — dotfiles apply"
+      (( ++warns ))
     fi
   fi
   if _df_behind "$DOTFILES" "$_df_remote" "$_df_branch"; then
     print -P "  $warn update available on $_df_remote/$_df_branch — dotfiles update"
+    (( ++warns ))
   else
     print -P "  $ok up to date with $_df_remote/$_df_branch"
   fi
   if [[ -d "$_df_self/.git" ]]; then
-    _df_behind "$_df_self" origin main \
-      && print -P "  $warn plugin update available — dotfiles plugin-update" \
-      || print -P "  $ok plugin up to date ($(_df_version))"
+    if _df_behind "$_df_self" origin main; then
+      print -P "  $warn plugin update available — dotfiles plugin-update"; (( ++warns ))
+    else
+      print -P "  $ok plugin up to date ($(_df_version))"
+    fi
   fi
+  # nothing to nag about — take the win
+  (( warns )) || _df_celebrate \
+    "everything in sync · $(git -C "$DOTFILES" rev-parse --short HEAD 2>/dev/null)" ""
 }
 
 # check the setup is healthy (generic plumbing; app-specific configs are yours)

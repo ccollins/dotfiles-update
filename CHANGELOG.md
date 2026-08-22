@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`dotfiles-banner`** — a rainbow block-letter `dotfiles` banner (Oh My Zsh's
+  post-upgrade logo moment) with a rotating tagline, printed after `dotfiles apply`,
+  after a plugin self-update, and when `dotfiles status` comes back all green. Ships as a
+  standalone bundled tool so an install/bootstrap script can print the identical art
+  (`dotfiles-banner "bootstrap complete"`). Colors degrade to 8-color and to plain text
+  (non-tty, `NO_COLOR`, `TERM=dumb`); `zstyle ':dotfiles:banner' mode plain` restores the
+  previous one-line output.
+- `dotfiles apply` now reports how many packages it restowed.
+
 ## [1.1.1] - 2026-08-07
 
 ### Fixed

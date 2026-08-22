@@ -13,10 +13,10 @@ jobs:
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install -y zsh jq shellcheck
       - name: shellcheck (bundled bash tools)
-        run: shellcheck --severity=warning bin/merge-managed-json bin/capture-managed-json
+        run: shellcheck --severity=warning bin/merge-managed-json bin/capture-managed-json bin/dotfiles-banner
       - name: syntax
         run: |
-          bash -n bin/merge-managed-json bin/capture-managed-json test/run.sh
+          bash -n bin/merge-managed-json bin/capture-managed-json bin/dotfiles-banner test/run.sh
           zsh -n dotfiles-update.plugin.zsh test/plugin-test.zsh
       - name: tests
         run: bash test/run.sh

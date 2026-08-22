@@ -84,6 +84,7 @@ DOTFILES_PACKAGES=(shell git ssh)           # stow packages to restow on "apply"
 zstyle ':dotfiles:update' mode      prompt   # prompt(default) | auto | reminder | disabled
 zstyle ':dotfiles:apply'  mode      prompt   # prompt(default) | auto | reminder | disabled
 zstyle ':dotfiles:plugin' mode      reminder # self-update: prompt | auto | reminder(default) | disabled
+zstyle ':dotfiles:banner' mode      fancy    # fancy(default) | plain — the ASCII banner
 zstyle ':dotfiles:update' frequency 1        # days between remote checks (throttle)
 zstyle ':dotfiles:update' remote    origin   # remote name
 zstyle ':dotfiles:update' branch    main     # tracked branch
@@ -138,6 +139,38 @@ One entry point, **`dotfiles <subcommand>`**:
   (see "Checking vendored dependencies" below).
 - **`dotfiles update`** / **`apply`** / **`plugin-update`** — see below.
 - **`dotfiles help`**.
+
+### The banner
+
+Applying, self-updating, and an all-green `dotfiles status` end in a rainbow
+`dotfiles` banner — the same "you did the thing" moment Oh My Zsh gives you after
+`upgrade_oh_my_zsh`, with a rotating tagline underneath:
+
+```
+██████╗  ██████╗ ████████╗███████╗██╗██╗     ███████╗███████╗
+██╔══██╗██╔═══██╗╚══██╔══╝██╔════╝██║██║     ██╔════╝██╔════╝
+██║  ██║██║   ██║   ██║   █████╗  ██║██║     █████╗  ███████╗
+██║  ██║██║   ██║   ██║   ██╔══╝  ██║██║     ██╔══╝  ╚════██║
+██████╔╝╚██████╔╝   ██║   ██║     ██║███████╗███████╗███████║
+╚═════╝  ╚═════╝    ╚═╝   ╚═╝     ╚═╝╚══════╝╚══════╝╚══════╝
+
+   ✨ applied at 9450ad0 · 7 packages restowed
+      your Mac, exactly as you left it
+```
+
+It's 61 columns wide. Set `zstyle ':dotfiles:banner' mode plain` for the previous
+one-line `✓ dotfiles applied at <sha>` output instead.
+
+The art is a standalone script, **`dotfiles-banner`** (on `PATH` with the other bundled
+tools), so your own install/bootstrap script can end on the same note:
+
+```sh
+dotfiles-banner "bootstrap complete" --tagline "welcome to the new Mac"
+dotfiles-banner --no-tagline "all green"
+```
+
+Color is dropped automatically when stdout isn't a terminal, when `NO_COLOR` is set, or
+when the terminal reports fewer than 8 colors.
 
 The underlying commands (also callable directly):
 
