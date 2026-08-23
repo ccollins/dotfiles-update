@@ -1,4 +1,4 @@
-# Recording the demo GIF
+# Recording the demo GIF and the banner still
 
 `record-demo.sh` stages a throwaway sandbox that triggers **every** startup signal
 (uncommitted, not-applied, update-available, plugin-update) and drops you into an
@@ -10,6 +10,7 @@ never touched.
 
 ```sh
 brew install asciinema agg   # agg converts the .cast recording to a .gif
+brew install imagemagick     # only for the banner still (padding), below
 ```
 
 ## Record
@@ -52,6 +53,33 @@ Then reference it near the top of the top-level `README.md`:
 ```md
 ![dotfiles-update in action](demo/demo.gif)
 ```
+
+## The banner still (`demo/banner.png`)
+
+The README's banner section shows a picture rather than a plain code block, so the
+rainbow actually reads. Same tooling, one frame:
+
+```sh
+# from the repo root
+TERM=xterm-256color asciinema rec /tmp/banner.cast --overwrite --window-size 61x11 \
+  -c "bash -c \"printf '\033[?25l'; bin/dotfiles-banner \
+     --tagline 'your Mac, exactly as you left it' \
+     'applied at a0db87a · 7 packages restowed'\""
+agg --quiet --select 100% /tmp/banner.cast /tmp/banner.gif
+magick /tmp/banner.gif -bordercolor '#282a36' -border 20x10 demo/banner.png
+```
+
+Why each bit:
+
+- **`61x11`** is the banner's exact width (61 columns) and height, so nothing wraps and
+  no empty rows are left over.
+- **`printf '\033[?25l'`** hides the cursor, which would otherwise be captured as a
+  block in the bottom-left corner.
+- **`--select 100%`** renders only the final frame — a still, not an animation.
+- **`magick … -border`** adds breathing room in agg's own background color
+  (`#282a36`, the same theme as `demo.gif`); agg has no padding option.
+
+Re-shoot it whenever the art, the message line, or the taglines change.
 
 ## Notes
 

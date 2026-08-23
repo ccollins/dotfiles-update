@@ -146,17 +146,7 @@ Applying, self-updating, and an all-green `dotfiles status` end in a rainbow
 `dotfiles` banner — the same "you did the thing" moment Oh My Zsh gives you after
 `upgrade_oh_my_zsh`, with a rotating tagline underneath:
 
-```
-██████╗  ██████╗ ████████╗███████╗██╗██╗     ███████╗███████╗
-██╔══██╗██╔═══██╗╚══██╔══╝██╔════╝██║██║     ██╔════╝██╔════╝
-██║  ██║██║   ██║   ██║   █████╗  ██║██║     █████╗  ███████╗
-██║  ██║██║   ██║   ██║   ██╔══╝  ██║██║     ██╔══╝  ╚════██║
-██████╔╝╚██████╔╝   ██║   ██║     ██║███████╗███████╗███████║
-╚═════╝  ╚═════╝    ╚═╝   ╚═╝     ╚═╝╚══════╝╚══════╝╚══════╝
-
-   ✨ applied at 9450ad0 · 7 packages restowed
-      your Mac, exactly as you left it
-```
+![the dotfiles banner](demo/banner.png)
 
 It's 61 columns wide. Set `zstyle ':dotfiles:banner' mode plain` for the previous
 one-line `✓ dotfiles applied at <sha>` output instead.
