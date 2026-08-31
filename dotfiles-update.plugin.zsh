@@ -101,6 +101,152 @@ _df_celebrate() {
   fi
 }
 
+# --- changelog ----------------------------------------------------------------
+
+# Render an Oh My Zsh-style changelog for a commit range.
+#
+# Commit subjects are read two ways, because dotfiles repos split about evenly
+# between the conventions: a Conventional Commit (`feat(scope): subject`) groups
+# the commit under its type, while a plain `scope: subject` just gets tagged with
+# its prefix. A subject with neither still lists fine, untagged. A trailing
+# `(#123)` from a squash merge is pulled out and colored like a PR ref.
+#
+#   $1 = repo dir  $2 = from rev  $3 = to rev (default HEAD)
+#   $4 = heading   $5 = remote for the compare URL (default origin)
+# Returns 1 when the range holds no commits, so callers can stay quiet.
+_df_changelog() {
+  emulate -L zsh
+  setopt local_options extended_glob
+  local dir=$1 from=$2 to=${3:-HEAD} heading=${4-} remote=${5:-origin}
+  [[ -d "$dir/.git" ]] || return 1
+  local f_s t_s
+  f_s=$(git -C "$dir" rev-parse --short "$from" 2>/dev/null) || return 1
+  t_s=$(git -C "$dir" rev-parse --short "$to" 2>/dev/null) || return 1
+
+  local -a raw
+  raw=( ${(f)"$(git -C "$dir" log --no-merges --format='%h%x1f%s' "$from..$to" 2>/dev/null)"} )
+  raw=( ${raw:#} )
+  (( ${#raw} )) || return 1
+
+  local limit; zstyle -s ':dotfiles:changelog' limit limit || limit=50
+  local -i extra=0
+  if (( ${#raw} > limit )); then
+    extra=$(( ${#raw} - limit ))
+    raw=( ${raw[1,limit]} )
+  fi
+
+  # Conventional Commit types we recognize, in the order they're printed. A
+  # prefix that isn't one of these is treated as a scope, not a type.
+  local -a TYPES=(feat fix perf revert refactor docs test build ci style chore)
+  local -A TITLE=(
+    feat "Features" fix "Bug fixes" perf "Performance" revert "Reverts"
+    refactor "Refactors" docs "Documentation" test "Tests" build "Build"
+    ci "CI" style "Style" chore "Chores" _other "Changes"
+  )
+
+  local C_SHA='' C_SCOPE='' C_REF='' C_HEAD='' C_BR='' C_DIM='' C_OFF=''
+  if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+    local depth; depth=$(TERM="${TERM:-dumb}" tput colors 2>/dev/null || echo 0)
+    if (( depth >= 8 )); then
+      C_SHA=$'\e[33m'; C_SCOPE=$'\e[1;33m'; C_REF=$'\e[32m'
+      C_HEAD=$'\e[1;34m'; C_BR=$'\e[1;4m'; C_DIM=$'\e[2m'; C_OFF=$'\e[0m'
+    fi
+  fi
+
+  local -A bucket
+  local -i width=0 seq=0
+  local l sha subj prefix head rest ref cscope ctype key
+  for l in $raw; do
+    sha=${l%%$'\x1f'*}; subj=${l#*$'\x1f'}
+    # trailing "(#123)" from a squash merge -> its own column
+    ref=''
+    if [[ "$subj" == *' (#'<->')' ]]; then
+      ref=${subj##* }
+      subj=${subj[1,-$(( ${#ref} + 2 ))]}
+    fi
+    ctype=''; cscope=''
+    prefix=${subj%%:*}
+    # a prefix is only a prefix if there was a colon and it's a single token
+    if [[ "$prefix" != "$subj" && -n "$prefix" && "$prefix" != *[[:space:]]* ]]; then
+      rest=${subj#*:}; rest=${rest##[[:space:]]#}
+      head=${${prefix%%\(*}%\!}
+      if (( ${TYPES[(Ie)$head]} )); then
+        ctype=$head
+        [[ "$prefix" == *\(*\)* ]] && cscope=${${prefix#*\(}%\)*}
+      else
+        cscope=$prefix
+      fi
+      [[ -n "$rest" ]] && subj=$rest
+    fi
+    [[ -n "$subj" ]] && subj="${(U)subj[1]}${subj[2,-1]}"
+    (( ${#cscope} > width )) && width=${#cscope}
+    key=${ctype:-_other}
+    # Scope leads the record so each group sorts by it (as OMZ does), which keeps
+    # the [scope] column reading down the page. The counter behind it is the
+    # tiebreaker: zsh's sort isn't stable, and without it commits sharing a scope
+    # (in particular the unscoped ones) would come out ordered by sha, not by date.
+    bucket[$key]+="${cscope}"$'\x1f'"${(l:6::0:)seq}"$'\x1f'"${sha}"$'\x1f'"${subj}"$'\x1f'"${ref}"$'\n'
+    (( ++seq ))
+  done
+
+  local br; br=$(git -C "$dir" symbolic-ref --short -q HEAD 2>/dev/null)
+  [[ -n "$heading" ]] && print -r -- "${C_HEAD}${heading}${C_OFF}"
+  print -r -- "${C_BR}${br:-$t_s}${C_OFF}  ${C_DIM}${f_s}..${t_s}${C_OFF}"
+
+  local pad='' t rec rsha rsc rsub rref tag
+  local -i n
+  for t in $TYPES _other; do
+    [[ -n "${bucket[$t]}" ]] || continue
+    print -r --
+    print -r -- "${C_HEAD}${TITLE[$t]}:${C_OFF}"
+    print -r --
+    for rec in ${(oi)${(f)bucket[$t]}}; do
+      [[ -n "$rec" ]] || continue
+      rsc=${rec%%$'\x1f'*};  rec=${rec#*$'\x1f'}
+      rec=${rec#*$'\x1f'}                       # drop the sort tiebreaker
+      rsha=${rec%%$'\x1f'*}; rec=${rec#*$'\x1f'}
+      rsub=${rec%%$'\x1f'*}; rref=${rec#*$'\x1f'}
+      tag=''
+      if (( width )); then
+        if [[ -n "$rsc" ]]; then
+          n=$(( width - ${#rsc} ))
+          tag="${C_SCOPE}[${rsc}]${C_OFF}${(l:$n:)pad} "
+        else
+          n=$(( width + 2 ))
+          tag="${(l:$n:)pad} "
+        fi
+      fi
+      print -r -- "  - ${C_SHA}${rsha}${C_OFF} ${tag}${rsub}${rref:+ ${C_REF}${rref}${C_OFF}}"
+    done
+  done
+
+  print -r --
+  (( extra )) && print -r -- "  ${C_DIM}... and $extra more commit$( (( extra == 1 )) || print -n s )${C_OFF}"
+  local slug; slug=$(_df_slug "$dir" "$remote")
+  [[ -n "$slug" ]] && print -r -- "  ${C_DIM}full diff: https://github.com/$slug/compare/${f_s}...${t_s}${C_OFF}"
+  return 0
+}
+
+# `dotfiles changelog [from [to]]`. With no args: what's landed since the
+# commit that was last applied to this machine, falling back to recent history
+# when the repo is already applied.
+_df_changelog_cmd() {
+  emulate -L zsh
+  local from=${1-} to=${2:-HEAD}
+  [[ -d "$DOTFILES/.git" ]] || { print -P "%F{red}✗ $DOTFILES is not a git repo%f"; return 1 }
+  if [[ -z "$from" ]]; then
+    if [[ -f "$_df_installed_file" ]]; then
+      from=$(<"$_df_installed_file")
+      [[ "$(git -C "$DOTFILES" rev-parse HEAD 2>/dev/null)" != "$from" ]] || from=''
+    fi
+    [[ -n "$from" ]] || from='HEAD~10'
+    git -C "$DOTFILES" rev-parse --verify -q "$from^{commit}" >/dev/null 2>&1 ||
+      from=$(git -C "$DOTFILES" rev-list --max-parents=0 HEAD 2>/dev/null | tail -1)
+  fi
+  _df_changelog "$DOTFILES" "$from" "$to" "" "$_df_remote" ||
+    { print -P "%F{yellow}no commits between ${from:-?} and $to%f"; return 1 }
+}
+
 # --- public helpers -----------------------------------------------------------
 
 # apply the repo to the machine (restow packages or run the hook), then record
@@ -144,11 +290,15 @@ dotfiles-update() {
     print -P "%F{yellow}⚠ dotfiles is on '${cur:-detached HEAD}', not $_df_branch — not auto-pulling. Switch to $_df_branch first.%f"
     return 1
   fi
+  local before; before=$(git -C "$DOTFILES" rev-parse HEAD 2>/dev/null)
   git -C "$DOTFILES" pull --ff-only --quiet "$_df_remote" "$_df_branch" || {
     print -P "%F{red}✗ dotfiles pull was not a fast-forward — resolve manually in $DOTFILES%f"
     return 1
   }
   _df_stamp "$_df_update_file"
+  local after; after=$(git -C "$DOTFILES" rev-parse HEAD 2>/dev/null)
+  [[ "$before" != "$after" ]] &&
+    _df_changelog "$DOTFILES" "$before" "$after" "Updating dotfiles" "$_df_remote"
   _df_handle_apply
 }
 
@@ -156,8 +306,12 @@ dotfiles-update() {
 dotfiles-plugin-update() {
   emulate -L zsh
   [[ -d "$_df_self/.git" ]] || { print -P "%F{yellow}⚠ plugin dir $_df_self is not a git checkout — reinstall to enable self-update%f"; return 1; }
+  local before; before=$(git -C "$_df_self" rev-parse HEAD 2>/dev/null)
   if git -C "$_df_self" pull --ff-only --quiet; then
     _df_stamp "$_df_plugin_file"
+    local after; after=$(git -C "$_df_self" rev-parse HEAD 2>/dev/null)
+    [[ "$before" != "$after" ]] &&
+      _df_changelog "$_df_self" "$before" "$after" "Updating the dotfiles-update plugin" origin
     _df_celebrate "plugin updated to $(_df_version)" \
       "%F{green}✓ dotfiles-update plugin updated to $(_df_version) — run 'exec zsh' to load it%f" \
       "run 'exec zsh' to load it"
@@ -173,6 +327,7 @@ _df_help() {
   print -r -- 'dotfiles — manage your dotfiles repo
   status         show current state (dirty · unpushed · not-applied · behind · plugin)
   update         pull the tracked branch, then apply
+  changelog      what changed [from [to]] (default: since the applied commit)
   apply          restow packages / run apply hook, record installed commit
   plugin-update  update the dotfiles-update plugin itself
   doctor         check the setup is healthy
@@ -266,6 +421,7 @@ dotfiles() {
     status)        _df_status ;;
     doctor)        _df_doctor ;;
     update)        dotfiles-update "$@" ;;
+    changelog|log) _df_changelog_cmd "$@" ;;
     apply)         dotfiles-apply "$@" ;;
     plugin-update) dotfiles-plugin-update "$@" ;;
     vendored)      _df_vendored "$@" ;;
