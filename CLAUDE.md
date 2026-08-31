@@ -115,8 +115,25 @@ so on) instead of the flat `Changes:` list. Use them when they genuinely fit. Do
 `feat:` / `chore:` onto changes they describe badly; an accurate subject under `Changes:`
 beats a mislabeled one under a heading.
 
-**On `gh pr merge --auto`:** this repo has CI, so GitHub accepts the flag (unlike the
-`dotfiles` repo, where a PR with no required checks is already mergeable and the flag is
-rejected outright). It is not a substitute for merging: with the `test` check passing but
-not marked *required* in branch protection, an auto-merge-enabled PR still sat open and
-needed a plain `gh pr merge --squash --delete-branch`.
+**The repo has to be set to use the PR title, or none of the above holds.** GitHub's
+default squash setting is `COMMIT_OR_PR_TITLE`, which silently uses the *branch commit's*
+message whenever the branch has exactly one commit. On that default a branch committed as
+`wip` lands on `main` as `wip (#19)`, and the title you wrote is discarded. This repo is
+set to `PR_TITLE` / `PR_BODY`. Verify, or fix a new repo, with:
+
+```bash
+gh api repos/<owner>/<repo> --jq '.squash_merge_commit_title'      # want PR_TITLE
+gh api -X PATCH repos/<owner>/<repo> \
+  -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY
+```
+
+**Wait for `test` before merging.** It is a required check, so a merge attempted while it
+is still running is refused, and `gh` unhelpfully suggests `--admin`. That message means
+"the check has not reported yet", not "you need admin rights". Wait and re-run the merge.
+
+**On `gh pr merge --auto`:** GitHub accepts the flag here, because a required check exists
+to wait on. The `dotfiles` repo has none, so a fresh PR is already mergeable there and the
+flag is rejected outright with `GraphQL: Pull request is in clean status`. Accepting it is
+not the same as merging, though: on #18 auto-merge was enabled and the PR was still open a
+minute after `test` went green, and a plain `gh pr merge --squash --delete-branch` is what
+landed it. I don't know why it didn't fire; assume nothing and check the PR state.
