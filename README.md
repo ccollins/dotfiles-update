@@ -21,7 +21,7 @@ repo (`$DOTFILES`, default `~/dotfiles`):
 |--------|----------|----------|--------|
 | **Uncommitted / unpushed** | working tree & upstream | no | a warning |
 | **Not applied** | local `HEAD` vs the last *applied* commit | no | `dotfiles-apply` (restow) |
-| **Update available** | local vs the tracked remote branch | yes (throttled) | `dotfiles-update` (pull) + a changelog link |
+| **Update available** | local vs the tracked remote branch | yes (throttled) | `dotfiles-update` (pull), which prints a changelog of what it pulled |
 | **Plugin update** | this plugin's own checkout vs its remote | yes (throttled) | `dotfiles-plugin-update` + a changelog link |
 
 The **"plugin update"** signal is the plugin dogfooding itself: it checks whether the
@@ -88,6 +88,7 @@ zstyle ':dotfiles:banner' mode      fancy    # fancy(default) | plain — the AS
 zstyle ':dotfiles:update' frequency 1        # days between remote checks (throttle)
 zstyle ':dotfiles:update' remote    origin   # remote name
 zstyle ':dotfiles:update' branch    main     # tracked branch
+zstyle ':dotfiles:changelog' limit  50       # commits listed after an update
 ```
 
 Modes (borrowed verbatim from OMZ):
@@ -137,8 +138,65 @@ One entry point, **`dotfiles <subcommand>`**:
   fresh machine.
 - **`dotfiles vendored`** — check vendored (pinned) dependencies for upstream updates
   (see "Checking vendored dependencies" below).
+- **`dotfiles changelog [from [to]]`**: what changed, in the Oh My Zsh post-update
+  format (see "The changelog" below). With no arguments it shows what has landed since
+  the commit last applied to this machine.
 - **`dotfiles update`** / **`apply`** / **`plugin-update`** — see below.
 - **`dotfiles help`**.
+
+### The changelog
+
+`dotfiles update` prints what it just pulled, the way `omz update` does, instead of
+leaving you to open a compare URL:
+
+```
+Updating dotfiles
+main  c8bc438..baa987c
+
+Features:
+
+  - 96baf69 [shell]         Add fzf keybindings (#3)
+
+Bug fixes:
+
+  - c454543                 Stop stowing the dead symlink (#5)
+
+Changes:
+
+  - baa987c                 Global instructions: rules for prose that doesn't read as AI (#23)
+  - 9c36cc5 [Brewfile]      Self-trust vendor taps, capture actionlint and PDF viewer (#22)
+  - f5d10ec [rfc-architect] Hold vendor ADRs to a higher bar than in-house ones (#21)
+
+  full diff: https://github.com/you/dotfiles/compare/c8bc438...baa987c
+```
+
+Subjects are read two ways, because dotfiles repos split about evenly between the
+conventions:
+
+- A **Conventional Commit** (`feat(shell): add fzf keybindings`) is filed under its type,
+  so you get the familiar `Features:` / `Bug fixes:` headings, with the scope in brackets.
+- A plain **`scope: subject`** prefix (`Brewfile: add ripgrep`) is not a type, so the
+  commit lands under `Changes:` with `[Brewfile]` as its tag. Repos that never write
+  conventional commits get one clean list rather than an empty set of headings.
+- A subject with neither prefix still lists, untagged.
+
+A trailing `(#123)` from a squash merge is pulled out and colored like a PR reference.
+Within a group, unscoped commits come first in date order and scoped ones follow
+alphabetically, which is what keeps the `[scope]` column readable down the page.
+
+`dotfiles plugin-update` prints the same thing for the plugin's own checkout. Color is
+dropped when stdout is not a terminal, when `NO_COLOR` is set, or below 8 colors. Long
+ranges are capped:
+
+```zsh
+zstyle ':dotfiles:changelog' limit 50   # commits listed before "... and N more"
+```
+
+One thing it deliberately does not do: the **startup** notice still links a GitHub compare
+URL rather than listing commits. At that point the check has only asked `git ls-remote`
+for the remote SHA, and the commits themselves are not in your object store yet. Listing
+them would mean a real `git fetch` on every shell start, which is the cost this plugin
+exists to avoid.
 
 ### The banner
 

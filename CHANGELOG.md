@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`dotfiles changelog`** + a changelog after every update. `dotfiles update` and
+  `dotfiles plugin-update` now print what they just pulled in the Oh My Zsh post-update
+  format (grouped headings, aligned `[scope]` column, colored sha and PR ref) instead of
+  only offering a compare URL. Subjects are parsed as Conventional Commits when the repo
+  writes them and as a plain `scope: subject` prefix when it doesn't, so a repo using
+  neither still gets one clean list. `dotfiles changelog [from [to]]` shows the same view
+  on demand, defaulting to everything since the commit last applied to this machine.
+  `zstyle ':dotfiles:changelog' limit N` caps long ranges. The startup notice keeps its
+  compare URL, since listing commits there would require a `git fetch` on every shell start.
 - **`dotfiles-banner`** — a rainbow block-letter `dotfiles` banner (Oh My Zsh's
   post-upgrade logo moment) with a rotating tagline, printed after `dotfiles apply`,
   after a plugin self-update, and when `dotfiles status` comes back all green. Ships as a
