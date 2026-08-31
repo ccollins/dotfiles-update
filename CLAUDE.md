@@ -65,8 +65,17 @@ CHANGELOG.md                 # Keep a Changelog; new work goes under [Unreleased
 
 ## Conventions
 
-- **Changes to `main` go through a PR, not a direct commit.** Branch, PR, squash-merge.
-  The PR keeps a reviewable, linear history even solo.
+- **Changes to `main` go through a PR, not a direct commit.** This is enforced, not just
+  intended: `main` carries the **`main: PR + squash only`** ruleset with no bypass actors,
+  mirroring the `dotfiles` repo. A direct push is rejected with `Changes must be made
+  through a pull request`, force-pushes and deletion of `main` are blocked, history must
+  stay linear, and squash is the only merge method offered. The `test` check is required
+  by the same ruleset, so a merge before CI reports is refused. The repo itself allows
+  only squash merges and deletes the branch on merge.
+- **Rewriting `main` therefore takes a deliberate detour.** The ruleset has to be set to
+  `evaluate` or `disabled` and then restored; there is no admin bypass. That friction is
+  the point. Prefer a follow-up commit over a rewrite unless the subject on `main` is
+  actively wrong.
 - Never break the public interface (`zstyle` names, `DOTFILES_*` variables, subcommand
   names, the bundled tools' argument order) without a CHANGELOG note. Other repos and
   other people's bootstrap scripts call into these.
