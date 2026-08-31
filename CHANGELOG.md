@@ -15,6 +15,9 @@ All notable changes to this project are documented here. The format is based on
   on demand, defaulting to everything since the commit last applied to this machine.
   `zstyle ':dotfiles:changelog' limit N` caps long ranges. The startup notice keeps its
   compare URL, since listing commits there would require a `git fetch` on every shell start.
+- **`CLAUDE.md`** documenting the repo's layout, the three-repo routing rule, the test and
+  CHANGELOG expectations, and the `<scope>: <subject>` PR title format that feeds the
+  changelog renderer.
 - **`dotfiles-banner`** — a rainbow block-letter `dotfiles` banner (Oh My Zsh's
   post-upgrade logo moment) with a rotating tagline, printed after `dotfiles apply`,
   after a plugin self-update, and when `dotfiles status` comes back all green. Ships as a
