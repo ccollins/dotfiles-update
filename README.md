@@ -239,8 +239,10 @@ this (added to `PATH` when the plugin loads):
 - **`merge-managed-json <base> <live> [local-key…]`** — regenerate the app-owned `live`
   file from a tracked `base`: base wins for shared keys, while the listed **machine-local
   keys** are preserved from whatever the app last wrote. Only **top-level** keys are
-  handled. If `live` has shared changes not in `base`, it prints a loud warning (never a
-  silent revert) telling you to `capture` them.
+  handled. A key is shared only if `base` defines it: when `live` has changed one, it
+  prints a loud warning (never a silent revert) telling you to `capture` it, and saves
+  the previous file to `<live>.bak`. Keys in neither `base` nor the local list are kept
+  as-is with a notice, so a setting the app adds later is never dropped.
 - **`capture-managed-json <base> <live> [local-key…]`** — the inverse: promote `live`'s
   shared keys back into the tracked `base` (excluding the machine-local keys). Run it
   after you change shared settings in-app, then commit the base.

@@ -5,7 +5,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **`merge-managed-json` no longer deletes keys the base doesn't define.** Only keys in
+  the base are shared; a live key that is in neither the base nor the local-key list
+  (usually a setting the app added after the base was captured, like Claude Code's
+  `autoMode` or `modelSettings`) is now kept, with a notice suggesting `capture` or a
+  local key. Before, it was treated as drift and dropped, and the warning
+  pointing at `capture-managed-json` arrived after the value was already gone. One
+  consequence: deleting a key from the base no longer removes it from live files.
+
 ### Added
+- `merge-managed-json` saves the previous live file to `<live>.bak` whenever a run
+  changes it, so a reverted shared key can always be recovered. The copy is the raw
+  bytes, so an unparseable file survives too. A run that changes nothing leaves the
+  last backup alone.
 - **`dotfiles changelog`** + a changelog after every update. `dotfiles update` and
   `dotfiles plugin-update` now print what they just pulled in the Oh My Zsh post-update
   format (grouped headings, aligned `[scope]` column, colored sha and PR ref) instead of
