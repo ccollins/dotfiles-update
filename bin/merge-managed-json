@@ -17,6 +17,12 @@
 # in-app) are reverted on the next run — this prints a loud warning naming them so
 # it's never silent. Promote them into the base first with `capture-managed-json`.
 #
+# A key is SHARED only if the base defines it. A live key that is in neither the base
+# nor the local list (typically a setting the app added since the base was captured)
+# is kept as-is with a notice, never deleted: nobody has decided yet whether it is
+# shared or local. Whenever a run changes an existing live file, the previous
+# contents are saved to <live>.bak first, so a revert is always recoverable.
+#
 # Example — Claude Code, keeping the per-machine model out of git:
 #   merge-managed-json "$DOTFILES/claude/settings.base.json" \
 #                      "$HOME/.claude/settings.json" model
@@ -40,31 +46,54 @@ if [ -e "$LIVE" ]; then
   printf '%s' "$current" | jq empty >/dev/null 2>&1 || current='{}'
 fi
 
-# Warn (don't silently revert) when the live file has SHARED-key changes not in the
-# base — i.e. live-minus-local-keys differs from base.
+# Warn (don't silently revert) when the live file has changes to SHARED keys (keys
+# the base defines) that aren't in the base.
 drift="$(jq -rn --slurpfile base "$BASE" --argjson cur "$current" '
-  ($ARGS.positional) as $local
-  | ($cur | with_entries(select(.key as $k | ($local | index($k)) | not))) as $shared
-  | $base[0] as $b
-  | [ ($shared | keys[]) | select($shared[.] != $b[.]) ] | .[]
+  ($ARGS.positional) as $local | $base[0] as $b
+  | [ $cur | keys[] | . as $k | select(($local | index($k)) | not)
+      | select($b | has($k)) | select($cur[$k] != $b[$k]) ] | .[]
 ' --args "$@" 2>/dev/null || true)"
 if [ -n "$drift" ]; then
   echo "merge-managed-json: WARNING — $LIVE has shared changes not in the base;" >&2
   echo "  reverting to base for: $(echo "$drift" | paste -sd, -)" >&2
+  echo "  previous file saved to: $LIVE.bak" >&2
   echo "  keep them with: capture-managed-json \"$BASE\" \"$LIVE\" ${*:-}" >&2
+fi
+
+# Live keys the base doesn't define and that aren't declared local are kept, not
+# dropped. Say so, since they won't reach other machines until someone decides.
+unmanaged="$(jq -rn --slurpfile base "$BASE" --argjson cur "$current" '
+  ($ARGS.positional) as $local | $base[0] as $b
+  | [ $cur | keys[] | . as $k | select(($local | index($k)) | not)
+      | select(($b | has($k)) | not) ]
+  | .[]
+' --args "$@" 2>/dev/null || true)"
+if [ -n "$unmanaged" ]; then
+  echo "merge-managed-json: note — keeping keys the base doesn't define: $(echo "$unmanaged" | paste -sd, -)" >&2
+  echo "  share them with capture-managed-json, or list them as local keys" >&2
+fi
+
+# base wins for shared keys; graft each requested machine-local key from the live
+# file when it's present (non-null), and keep any key the base doesn't define.
+jq -n --slurpfile base "$BASE" --argjson cur "$current" '
+  ($ARGS.positional) as $local | $base[0] as $b
+  | ($cur | with_entries(select(.key as $k
+      | (($b | has($k)) | not) and (($local | index($k)) | not)))) as $unmanaged
+  | $unmanaged + $b
+  + ( reduce $local[] as $k ({};
+        if ($cur[$k] != null) then . + {($k): $cur[$k]} else . end) )
+' --args "$@" > "$LIVE.tmp"
+
+# Back up the previous contents before changing them (skip when nothing changes, so
+# an idempotent re-run doesn't clobber the last useful backup).
+# Copy the raw bytes, not the parsed JSON, so even an unparseable file survives.
+if [ -e "$LIVE" ] && [ "$(jq -S . "$LIVE" 2>/dev/null)" != "$(jq -S . "$LIVE.tmp")" ]; then
+  cat "$LIVE" > "$LIVE.bak"
 fi
 
 # Replace a legacy stow symlink with a real file we own (writing through it would
 # corrupt the tracked source).
 [ -L "$LIVE" ] && rm -f "$LIVE"
-
-# base wins for shared keys; graft each requested machine-local key from the live
-# file when it's present (non-null).
-jq -n --slurpfile base "$BASE" --argjson cur "$current" '
-  $base[0]
-  + ( reduce $ARGS.positional[] as $k ({};
-        if ($cur[$k] != null) then . + {($k): $cur[$k]} else . end) )
-' --args "$@" > "$LIVE.tmp"
 mv -f "$LIVE.tmp" "$LIVE"
 
 echo "merge-managed-json: wrote $LIVE (preserved local: ${*:-none})"
