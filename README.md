@@ -242,7 +242,10 @@ this (added to `PATH` when the plugin loads):
   handled. A key is shared only if `base` defines it: when `live` has changed one, it
   prints a loud warning (never a silent revert) telling you to `capture` it, and saves
   the previous file to `<live>.bak`. Keys in neither `base` nor the local list are kept
-  as-is with a notice, so a setting the app adds later is never dropped.
+  as-is with a notice, so a setting the app adds later is never dropped. For the same
+  reason, removing a key from `base` doesn't delete it from any live file; the next run
+  on each machine names the leftover keys so you can delete them by hand (it compares
+  against the copy of the last applied base it keeps in `<live>.last-base`).
 - **`capture-managed-json <base> <live> [local-key…]`** — the inverse: promote `live`'s
   shared keys back into the tracked `base` (excluding the machine-local keys). Run it
   after you change shared settings in-app, then commit the base.

@@ -84,6 +84,33 @@ echo '{"theme":"dark"}' > "$d/base9.json"; printf 'not json{' > "$d/live9.json"
 merge-managed-json "$d/base9.json" "$d/live9.json" model >/dev/null 2>&1
 eq "invalid: raw backup" "not json{" "$(cat "$d/live9.json.bak")"
 
+# 10. a key dropped from the base is kept in live and named once
+echo '{"theme":"dark","autoMode":{"x":1}}' > "$d/base10.json"
+merge-managed-json "$d/base10.json" "$d/live10.json" model >/dev/null 2>&1
+echo '{"theme":"dark"}' > "$d/base10.json"
+out10="$(merge-managed-json "$d/base10.json" "$d/live10.json" model 2>&1 >/dev/null)"
+has "removed: named" "$out10" "removed from the base but still set in $d/live10.json: autoMode"
+has "removed: other machines" "$out10" "any other machine that synced them"
+hasnt "removed: not double-reported" "$out10" "keeping keys the base doesn't define"
+eq "removed: still in live" "1" "$(jq -r '.autoMode.x' "$d/live10.json")"
+out10b="$(merge-managed-json "$d/base10.json" "$d/live10.json" model 2>&1 >/dev/null)"
+hasnt "removed: named only once" "$out10b" "removed from the base"
+has "removed: then just unmanaged" "$out10b" "keeping keys the base doesn't define: autoMode"
+
+# 11. no last-base yet (first run) -> nothing reported as removed
+echo '{"theme":"dark"}' > "$d/base11.json"
+echo '{"theme":"dark","autoMode":1}' > "$d/live11.json"
+out11="$(merge-managed-json "$d/base11.json" "$d/live11.json" model 2>&1 >/dev/null)"
+hasnt "first run: no removal claim" "$out11" "removed from the base"
+
+# 12. a removed key the live file no longer has is not reported
+echo '{"theme":"dark","gone":1}' > "$d/base12.json"
+merge-managed-json "$d/base12.json" "$d/live12.json" model >/dev/null 2>&1
+jq 'del(.gone)' "$d/live12.json" > "$d/t12" && mv "$d/t12" "$d/live12.json"
+echo '{"theme":"dark"}' > "$d/base12.json"
+out12="$(merge-managed-json "$d/base12.json" "$d/live12.json" model 2>&1 >/dev/null)"
+hasnt "removed but absent: quiet" "$out12" "removed from the base"
+
 echo "== capture-managed-json =="
 echo '{"old":true}' > "$d/cbase.json"
 echo '{"model":"opus","enabledPlugins":{"foo":true},"theme":"dark"}' > "$d/clive.json"

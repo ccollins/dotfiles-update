@@ -23,6 +23,11 @@
 # shared or local. Whenever a run changes an existing live file, the previous
 # contents are saved to <live>.bak first, so a revert is always recoverable.
 #
+# Removing a key from the base does NOT remove it from live files (this machine or
+# any other that already synced it). So each run records the base it applied in
+# <live>.last-base, and the next run names any key that has since left the base but
+# is still set here, once, so the leftover is a decision rather than a surprise.
+#
 # Example — Claude Code, keeping the per-machine model out of git:
 #   merge-managed-json "$DOTFILES/claude/settings.base.json" \
 #                      "$HOME/.claude/settings.json" model
@@ -60,12 +65,34 @@ if [ -n "$drift" ]; then
   echo "  keep them with: capture-managed-json \"$BASE\" \"$LIVE\" ${*:-}" >&2
 fi
 
+# Keys the previously applied base had, the current base dropped, and this live file
+# still carries. Not deleted (see header); named once so the leftover is deliberate.
+LAST_BASE="$LIVE.last-base"
+prev='{}'
+if [ -f "$LAST_BASE" ]; then
+  prev="$(cat "$LAST_BASE")"
+  printf '%s' "$prev" | jq -e 'type == "object"' >/dev/null 2>&1 || prev='{}'
+fi
+removed="$(jq -rn --slurpfile base "$BASE" --argjson cur "$current" --argjson prev "$prev" '
+  ($ARGS.positional) as $local | $base[0] as $b
+  | [ $prev | keys[] | . as $k | select(($b | has($k)) | not)
+      | select(($local | index($k)) | not) | select($cur | has($k)) ]
+  | .[]
+' --args "$@" 2>/dev/null || true)"
+if [ -n "$removed" ]; then
+  echo "merge-managed-json: NOTICE — removed from the base but still set in $LIVE: $(echo "$removed" | paste -sd, -)" >&2
+  echo "  they stay on this machine and on any other machine that synced them;" >&2
+  echo "  delete them from each live file by hand if they should be gone" >&2
+fi
+
 # Live keys the base doesn't define and that aren't declared local are kept, not
 # dropped. Say so, since they won't reach other machines until someone decides.
-unmanaged="$(jq -rn --slurpfile base "$BASE" --argjson cur "$current" '
+# (Keys just reported as removed are left out so this run doesn't name them twice.)
+unmanaged="$(jq -rn --slurpfile base "$BASE" --argjson cur "$current" --arg removed "$removed" '
   ($ARGS.positional) as $local | $base[0] as $b
+  | ($removed | split("\n")) as $gone
   | [ $cur | keys[] | . as $k | select(($local | index($k)) | not)
-      | select(($b | has($k)) | not) ]
+      | select(($b | has($k)) | not) | select(($gone | index($k)) | not) ]
   | .[]
 ' --args "$@" 2>/dev/null || true)"
 if [ -n "$unmanaged" ]; then
@@ -95,5 +122,8 @@ fi
 # corrupt the tracked source).
 [ -L "$LIVE" ] && rm -f "$LIVE"
 mv -f "$LIVE.tmp" "$LIVE"
+
+# Record what was applied so the next run can tell which keys left the base.
+jq . "$BASE" > "$LAST_BASE"
 
 echo "merge-managed-json: wrote $LIVE (preserved local: ${*:-none})"

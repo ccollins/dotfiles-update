@@ -15,6 +15,13 @@ All notable changes to this project are documented here. The format is based on
   consequence: deleting a key from the base no longer removes it from live files.
 
 ### Added
+- `merge-managed-json` now tells you when a key has been **removed from the base** but
+  is still set in the live file, naming each key and pointing out that it stays on this
+  machine and on any other machine that already synced it (removing it from the base
+  never deletes it anywhere). Each run records the base it applied in
+  `<live>.last-base` to detect this, so the alert fires once per machine, on the first
+  run after the removal; after that the key is reported like any other key the base
+  doesn't define. Nothing is reported on the first run, before a `.last-base` exists.
 - `merge-managed-json` saves the previous live file to `<live>.bak` whenever a run
   changes it, so a reverted shared key can always be recovered. The copy is the raw
   bytes, so an unparseable file survives too. A run that changes nothing leaves the
