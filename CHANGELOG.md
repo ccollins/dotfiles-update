@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- Renamed `CLAUDE.md` to `AGENTS.md`, with `CLAUDE.md` symlinked to it.
 - **`merge-managed-json` no longer deletes keys the base doesn't define.** Only keys in
   the base are shared; a live key that is in neither the base nor the local-key list
   (usually a setting the app added after the base was captured, like Claude Code's
